@@ -172,3 +172,16 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+
+
+
+
+
+
+
+# HuggingFace Hub dataset download location: to be downloaded by download-mnist.py in the data_dir below
+data/.mnist 
+
+# Pytorch builtin dataset download location
+data/MNIST
