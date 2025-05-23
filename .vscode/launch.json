@@ -8,6 +8,7 @@
             "program": "${workspaceFolder}/model/trainer.py",
             "console": "integratedTerminal",
             "justMyCode": true,
+            "cwd": "${workspaceFolder}/model",
             "env": {
                 "PYTHONPATH": "${workspaceFolder}"
             }
@@ -19,6 +20,7 @@
             "program": "${workspaceFolder}/data/download-mnist.py",
             "console": "integratedTerminal",
             "justMyCode": true,
+            "cwd": "${workspaceFolder}/data",
             "env": {
                 "PYTHONPATH": "${workspaceFolder}"
             }
