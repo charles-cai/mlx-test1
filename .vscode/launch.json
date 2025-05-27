@@ -5,7 +5,7 @@
             "name": "Python: MNIST Trainer",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/model/trainer.py",
+            "program": "${workspaceFolder}/model/MnistModel.py",
             "console": "integratedTerminal",
             "justMyCode": true,
             "cwd": "${workspaceFolder}/model",
@@ -26,6 +26,18 @@
             }
         },
         {
+            "name": "FastAPI: MNIST API",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/api/api.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "cwd": "${workspaceFolder}/api",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
             "name": "Python: Current File",
             "type": "debugpy",
             "request": "launch",
@@ -35,6 +47,20 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}"
             }
+        },
+        {
+            "name": "Debug Gradio App",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/app/app.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "DATABASE_URL": "postgresql://postgres:password@localhost:5432/mnist_db"
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}/app"
         }
     ]
 }

@@ -1,0 +1,14 @@
+# Gradio for web interface
+gradio #>=4.0.0
+
+# Database connectivity
+sqlalchemy #>=2.0.0
+psycopg2-binary #>=2.9.0
+
+# HTTP client for API calls
+requests #>=2.25.0
+
+# Additional dependencies
+numpy #>=1.21.0
+pillow #>=9.0.0
+httpx #>=0.25.0

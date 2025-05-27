@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: mnist_postgres
+    environment:
+      POSTGRES_DB: mnist_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # FastAPI Backend (built from api folder)
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    container_name: mnist_api
+    ports:
+      - "8889:8889"
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/mnist_db
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Gradio Frontend
+  app:
+    build: ./app
+    container_name: mnist_gradio
+    ports:
+      - "7860:7860"
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/mnist_db
+      - API_URL=http://api:8889
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

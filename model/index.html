@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MNIST Digit Recognition</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+
+        .upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            margin: 20px 0;
+            cursor: pointer;
+            transition: border-color 0.3s;
+        }
+
+        .upload-area:hover {
+            border-color: #007bff;
+        }
+
+        .upload-area.dragover {
+            border-color: #007bff;
+            background-color: #f8f9fa;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .btn {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+
+        .btn:hover {
+            background-color: #0056b3;
+        }
+
+        .btn:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        .result {
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 5px;
+            display: none;
+        }
+
+        .result.success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+
+        .result.error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+
+        .prediction {
+            font-size: 24px;
+            font-weight: bold;
+            text-align: center;
+            margin: 10px 0;
+        }
+
+        .confidence-scores {
+            margin-top: 15px;
+        }
+
+        .confidence-bar {
+            margin: 5px 0;
+            display: flex;
+            align-items: center;
+        }
+
+        .confidence-label {
+            width: 30px;
+            font-weight: bold;
+        }
+
+        .confidence-progress {
+            flex: 1;
+            height: 20px;
+            background-color: #e9ecef;
+            border-radius: 10px;
+            margin: 0 10px;
+            overflow: hidden;
+        }
+
+        .confidence-fill {
+            height: 100%;
+            background-color: #007bff;
+            transition: width 0.3s;
+        }
+
+        .confidence-value {
+            width: 60px;
+            text-align: right;
+            font-size: 12px;
+        }
+
+        .preview {
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .preview img {
+            max-width: 200px;
+            max-height: 200px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🔢 MNIST Digit Recognition</h1>
+        <p style="text-align: center; color: #666;">
+            Upload an image of a handwritten digit (0-9) and let our AI model predict what it is!
+        </p>
+
+        <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+            <p>📁 Click here to select an image or drag and drop</p>
+            <p style="font-size: 12px; color: #999;">Supported formats: PNG, JPG, JPEG, GIF</p>
+        </div>
+
+        <input type="file" id="fileInput" accept="image/*">
+
+        <div class="preview" id="preview" style="display: none;">
+            <h3>Preview:</h3>
+            <img id="previewImage" src="" alt="Preview">
+        </div>
+
+        <div style="text-align: center;">
+            <button class="btn" onclick="predictDigit()" id="predictBtn" disabled>🔮 Predict Digit</button>
+            <button class="btn" onclick="clearAll()" id="clearBtn">🗑️ Clear</button>
+        </div>
+
+        <div class="result" id="result">
+            <div class="prediction" id="prediction"></div>
+            <div class="confidence-scores" id="confidenceScores"></div>
+        </div>
+    </div>
+
+    <script>
+        let selectedFile = null;
+
+        // File input handler
+        document.getElementById('fileInput').addEventListener('change', function (e) {
+            handleFile(e.target.files[0]);
+        });
+
+        // Drag and drop handlers
+        const uploadArea = document.querySelector('.upload-area');
+
+        uploadArea.addEventListener('dragover', function (e) {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', function (e) {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', function (e) {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            handleFile(e.dataTransfer.files[0]);
+        });
+
+        function handleFile(file) {
+            if (!file) return;
+
+            if (!file.type.startsWith('image/')) {
+                alert('Please select an image file');
+                return;
+            }
+
+            selectedFile = file;
+
+            // Show preview
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                document.getElementById('previewImage').src = e.target.result;
+                document.getElementById('preview').style.display = 'block';
+                document.getElementById('predictBtn').disabled = false;
+            };
+            reader.readAsDataURL(file);
+
+            // Hide previous results
+            document.getElementById('result').style.display = 'none';
+        }
+
+        async function predictDigit() {
+            if (!selectedFile) {
+                alert('Please select an image first');
+                return;
+            }
+
+            const predictBtn = document.getElementById('predictBtn');
+            const result = document.getElementById('result');
+
+            // Disable button and show loading
+            predictBtn.disabled = true;
+            predictBtn.textContent = '🔄 Predicting...';
+
+            try {
+                const formData = new FormData();
+                formData.append('file', selectedFile);
+
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                displayResult(data, true);
+
+            } catch (error) {
+                console.error('Error:', error);
+                displayResult({ error: error.message }, false);
+            } finally {
+                predictBtn.disabled = false;
+                predictBtn.textContent = '🔮 Predict Digit';
+            }
+        }
+
+        function displayResult(data, success) {
+            const result = document.getElementById('result');
+            const prediction = document.getElementById('prediction');
+            const confidenceScores = document.getElementById('confidenceScores');
+
+            result.className = 'result ' + (success ? 'success' : 'error');
+            result.style.display = 'block';
+
+            if (success) {
+                prediction.textContent = `Predicted Digit: ${data.predicted_digit} (${(data.confidence * 100).toFixed(1)}% confidence)`;
+
+                // Display confidence scores for all digits
+                let scoresHTML = '<h4>Confidence Scores for All Digits:</h4>';
+                for (let i = 0; i < 10; i++) {
+                    const confidence = data.confidence_scores[i.toString()];
+                    const percentage = (confidence * 100).toFixed(1);
+                    scoresHTML += `
+                        <div class="confidence-bar">
+                            <div class="confidence-label">${i}:</div>
+                            <div class="confidence-progress">
+                                <div class="confidence-fill" style="width: ${percentage}%"></div>
+                            </div>
+                            <div class="confidence-value">${percentage}%</div>
+                        </div>
+                    `;
+                }
+                confidenceScores.innerHTML = scoresHTML;
+            } else {
+                prediction.textContent = `Error: ${data.error}`;
+                confidenceScores.innerHTML = '';
+            }
+        }
+
+        function clearAll() {
+            selectedFile = null;
+            document.getElementById('fileInput').value = '';
+            document.getElementById('preview').style.display = 'none';
+            document.getElementById('result').style.display = 'none';
+            document.getElementById('predictBtn').disabled = true;
+        }
+    </script>
+</body>
+
+</html>

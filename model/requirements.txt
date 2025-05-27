@@ -1,0 +1,15 @@
+# PyTorch and ML dependencies
+torch #>=2.1.0
+torchvision #>=0.16.0
+pillow #>=10.0.0
+
+# Data handling
+numpy #>=1.24.0
+
+# FastAPI for model API service
+fastapi #>=0.104.1
+uvicorn[standard] #>=0.24.0
+python-multipart #>=0.0.6
+
+# Optional: For Jupyter notebooks or visualization
+matplotlib #>=3.7.0
