@@ -2,12 +2,10 @@ import gradio as gr
 import numpy as np
 import requests
 import io
-import hashlib
-import uuid
-from PIL import Image
 import os
-
-# Import local PostgresLogger
+import uuid
+import base64
+from PIL import Image
 try:
     from PostgresLogger import PostgresLogger
     DATABASE_AVAILABLE = True
@@ -15,265 +13,242 @@ except ImportError as e:
     print(f"Database import error: {e}")
     DATABASE_AVAILABLE = False
 
-# Global variables
-session_id = str(uuid.uuid4())
-API_URL = "http://localhost:8889"  # FastAPI endpoint
+API_URL = "http://localhost:8889"
 db_logger = None
-
-# Initialize database logger
+current_prediction = None
+current_confidence = None
 if DATABASE_AVAILABLE:
     try:
         DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:password@localhost:5432/mnist_db")
         db_logger = PostgresLogger(
             database_url=DATABASE_URL,
-            model_name="MnistModel",
-            session_id=session_id
+            model_name="MnistModel"
         )
-        print(f"✅ Database logger initialized")
+        print(f"✅ Database logger initialized with URL: {DATABASE_URL}")
     except Exception as e:
         print(f"❌ Failed to initialize database logger: {e}")
         DATABASE_AVAILABLE = False
 
-def predict_digit(image, true_label=None):
-    """
-    Predict digit from drawn image using the FastAPI endpoint
-    
-    Args:
-        image: PIL Image or numpy array from Gradio
-        true_label: Optional user-provided true label
-        
-    Returns:
-        Tuple of (prediction_text, confidence_chart, database_status)
-    """
-    # Check if image is provided
-    if image is None:
-        return "❌ Please draw something first", None, "Image: No image provided"
-    
+def predict_with_numpy_api(image_array: np.ndarray) -> dict:
     try:
-        # Convert image to PIL format
-        pil_image = None
+        image_bytes = image_array.tobytes()
+        image_b64 = base64.b64encode(image_bytes).decode('utf-8')
         
-        if isinstance(image, np.ndarray):
-            print(f"Debug: Received numpy array with shape: {image.shape}, dtype: {image.dtype}")
-            
-            # Handle different array dimensions
-            if len(image.shape) == 3:
-                # If it's RGB/RGBA, convert to grayscale
-                if image.shape[2] == 3:  # RGB
-                    image = np.dot(image[...,:3], [0.2989, 0.5870, 0.1140])
-                elif image.shape[2] == 4:  # RGBA
-                    image = np.dot(image[...,:3], [0.2989, 0.5870, 0.1140])
-                image = image.astype(np.uint8)
-            elif len(image.shape) == 2:
-                # Already grayscale
-                pass
-            else:
-                return "❌ Invalid image dimensions", None, "Image: Invalid dimensions"
-            
-            # Normalize to 0-255 range
-            if image.max() <= 1.0:
-                image = (image * 255).astype(np.uint8)
-            
-            # Convert to PIL Image
-            pil_image = Image.fromarray(image, mode='L')
-            
-        elif hasattr(image, 'convert'):
-            # It's already a PIL Image
-            print(f"Debug: Received PIL Image with mode: {image.mode}, size: {image.size}")
-            pil_image = image.convert('L')
-            
+        request_data = {
+            "image_data": image_b64,
+            "shape": list(image_array.shape),
+            "dtype": str(image_array.dtype)
+        }
+        
+        response = requests.post(f"{API_URL}/predict-numpy", json=request_data, timeout=10)
+        
+        if response.status_code == 200:
+            return response.json()
         else:
-            print(f"Debug: Unknown image type: {type(image)}")
-            return f"❌ Unsupported image type: {type(image)}", None, "Image: Unsupported type"
-        
-        # Verify we have a valid PIL image
+            raise Exception(f"API Error: {response.status_code}")
+            
+    except Exception as e:
+        raise Exception(f"Numpy API call failed: {str(e)}")
+
+def predict_digit(image):
+    global current_prediction, current_confidence
+
+    try:
+        pil_image = image["composite"]
+
         if pil_image is None:
-            return "❌ Failed to process image", None, "Image: Processing failed"
+            return "❌ Please draw something first", "0%", get_history_table(), ""
+
+#        pil_image = image.convert('L')
+
+        if pil_image.getextrema() == (0, 0):
+            return "❌ Please draw something", "0%", get_history_table(), ""
         
-        # Resize to 28x28 for MNIST (if not already)
         if pil_image.size != (28, 28):
             pil_image = pil_image.resize((28, 28), Image.Resampling.LANCZOS)
         
         print(f"Debug: Final PIL image - Mode: {pil_image.mode}, Size: {pil_image.size}")
         
-        # Convert to bytes for API call
         img_byte_arr = io.BytesIO()
         pil_image.save(img_byte_arr, format='PNG')
         image_bytes = img_byte_arr.getvalue()
         
         print(f"Debug: Image bytes length: {len(image_bytes)}")
         
-        # Call FastAPI endpoint
         try:
             files = {'file': ('image.png', image_bytes, 'image/png')}
             response = requests.post(f"{API_URL}/predict", files=files, timeout=10)
             
-            if response.status_code != 200:
-                return f"❌ API Error: {response.status_code} - {response.text}", None, "API: Error"
-            
-            result = response.json()
-            
-        except requests.exceptions.RequestException as e:
-            return f"❌ Failed to connect to API: {str(e)}", None, f"API: Connection failed - {API_URL}"
-        
-        predicted_digit = result['predicted_digit']
-        confidence = result['confidence']
-        confidence_scores = result['confidence_scores']
-        
-        # Create image hash for database
-        image_hash = hashlib.md5(image_bytes).hexdigest()
-        
-        # Prepare prediction text
-        prediction_text = f"""
-🎯 **Predicted Digit: {predicted_digit}**
-🎪 **Confidence: {confidence:.1%}**
-
-📊 **All Probabilities:**
-"""
-        
-        # Create confidence chart data
-        chart_data = []
-        for digit in range(10):
-            chart_data.append({
-                "digit": str(digit),
-                "confidence": float(confidence_scores[str(digit)])
-            })
-        
-        # Database logging
-        database_status = "Database: Not configured"
-        if DATABASE_AVAILABLE and db_logger:
-            try:
-                # Log to database using PostgresLogger
-                success = db_logger.log_prediction(
-                    prediction=float(predicted_digit),
-                    true_label=float(true_label) if true_label is not None else None,
-                    confidence=confidence,
-                    input_shape="(28, 28, 1)",
-                    metadata={
-                        "confidence_scores": confidence_scores,
-                        "image_hash": image_hash,
-                        "session_id": session_id
-                    }
-                )
+            if response.status_code == 200:
+                result = response.json()
+                prediction = result.get('predicted_digit', 'Unknown')
+                confidence = result.get('confidence', 0.0) * 100
                 
-                if success:
-                    database_status = "Database: ✅ Logged successfully"
-                else:
-                    database_status = "Database: ❌ Failed to log"
-                    
-            except Exception as db_error:
-                database_status = f"Database: ❌ Error - {str(db_error)}"
-        
-        # Add individual probabilities to text
-        for digit in range(10):
-            conf = float(confidence_scores[str(digit)])
-            bar = "█" * int(conf * 20)  # Simple text bar
-            prediction_text += f"\n{digit}: {conf:.1%} {bar}"
-        
-        return prediction_text, chart_data, database_status
+                current_prediction = prediction
+                current_confidence = confidence
+                
+                prediction_text = f"{prediction}"
+                confidence_text = f"{confidence:.1f}%"
+                
+                return prediction_text, confidence_text, get_history_table(), ""
+            else:
+                return f"❌ API Error: {response.status_code}", "0%", get_history_table(), ""
+                
+        except requests.exceptions.RequestException as e:
+            return f"❌ Connection Error: {str(e)}", "0%", get_history_table(), ""
         
     except Exception as e:
-        print(f"Debug: Exception in predict_digit: {e}")
-        import traceback
-        traceback.print_exc()
-        return f"❌ Prediction error: {str(e)}", None, f"Error: {str(e)}"
+        print(f"Error in predict_digit: {e}")
+        return f"❌ Error: {str(e)}", "0%", get_history_table(), ""
 
-def update_true_label(image, predicted_text, true_label):
-    """Update the database with user-provided true label"""
-    if true_label is None:
-        return "Please select the correct digit first"
+def submit_prediction(true_label_input):
+    global current_prediction, current_confidence
     
-    # Re-run prediction with true label
-    prediction_text, confidence_chart, database_status = predict_digit(image, int(true_label))
-    return f"✅ Updated with true label: {true_label}\n\n{prediction_text}"
+    if current_prediction is None:
+        return get_history_table()
+    
+    true_label = None
+    if true_label_input and str(true_label_input).strip():
+        try:
+            true_label = int(true_label_input)
+            if not (0 <= true_label <= 9):
+                print(f"Invalid true label: {true_label}. Must be 0-9")
+                return get_history_table()
+        except ValueError:
+            print(f"Invalid true label format: {true_label_input}")
+            return get_history_table()
+    
+    # Log to database
+    if DATABASE_AVAILABLE and db_logger:
+        try:
+            success = db_logger.log_prediction(
+                prediction=current_prediction,
+                confidence=current_confidence,
+                true_label=true_label
+            )
+            if success:
+                print(f"✅ Logged: prediction={current_prediction}, confidence={current_confidence}, label={true_label}")
+            else:
+                print("❌ Failed to log prediction")
+        except Exception as e:
+            print(f"❌ Database error: {e}")
+    
+    return get_history_table()
+
+def get_history_table():
+    """
+    Get recent predictions from database as formatted table
+    
+    Returns:
+        List of lists for Gradio DataFrame
+    """
+    if not DATABASE_AVAILABLE or not db_logger:
+        return [["Database not available", "", "", ""]]
+    
+    try:
+        records = db_logger.get_recent_predictions(limit=100)
+        if not records:
+            return [["No predictions yet", "", "", ""]]
+        
+        # Format for Gradio table: [timestamp, prediction, confidence, label]
+        table_data = []
+        for record in records:
+            timestamp = record['created_at'][:19].replace('T', ' ')  # Remove microseconds and timezone
+            pred = str(record['predicted_digit'])
+            conf = f"{record['confidence']:.1f}%"
+            label = str(record['label']) if record['label'] is not None else ""
+            table_data.append([timestamp, pred, conf, label])
+        
+        return table_data
+        
+    except Exception as e:
+        print(f"Error getting history: {e}")
+        return [["Error loading history", "", "", ""]]
+    
+def clear_canvas():
+    black_image = Image.new('L', (280, 280), 0) 
+    return {
+        "background": black_image, 
+        "layers": None,
+        "composite": black_image
+    }
 
 def create_interface():
     """Create and configure the Gradio interface"""
     
     with gr.Blocks(title="MNIST Digit Recognizer", theme=gr.themes.Soft()) as interface:
-        gr.Markdown("# 🔢 MNIST Digit Recognition")
-        gr.Markdown("Draw a digit (0-9) in the canvas below and get AI predictions!")
+        gr.Markdown("# 🔢 MNIST Digit Recognizer")
+        gr.Markdown("Draw a digit (0-9) and get AI predictions!")
         
         with gr.Row():
             with gr.Column(scale=1):
-                # Drawing canvas
-                canvas = gr.Sketchpad(
+                # Drawing canvas with black brush
+                canvas = gr.ImageEditor(
+                    value = clear_canvas(),
                     label="✏️ Draw a digit here",
                     type="pil",
                     image_mode="L",
-                    canvas_size=(280, 280)
-                    # brush_radius=15
+                    brush = gr.Brush(default_color="white", default_size=10),
+                    canvas_size=(280, 280),
+                    eraser=gr.Eraser(default_size=10),
                 )
                 
-                # True label input
-                true_label = gr.Dropdown(
-                    choices=list(range(10)),
-                    label="🎯 What digit did you actually draw?",
-                    info="Optional: Help improve the model!"
-                )
+                # fix clear button will restore the ImageEditor to be white background
+                # canvas.clear(clear_canvas)
+
+                # Predict button
+                predict_btn = gr.Button("🔮 Predict Digit", variant="primary", size="lg")
                 
-                # Buttons
-                with gr.Row():
-                    predict_btn = gr.Button("🔮 Predict Digit", variant="primary")
-                    update_btn = gr.Button("📝 Update True Label", variant="secondary")
-                    clear_btn = gr.Button("🗑️ Clear Canvas")
-            
             with gr.Column(scale=1):
-                # Results display
-                prediction_output = gr.Markdown(
-                    label="🎯 Prediction Results",
-                    value="Draw a digit and click 'Predict Digit' to see results!"
-                )
+                # Results section
+                gr.Markdown("### Results")
                 
-                # Confidence chart
-                confidence_chart = gr.BarPlot(
-                    x="digit",
-                    y="confidence",
-                    title="📊 Confidence Scores by Digit",
-                    x_title="Digit",
-                    y_title="Confidence",
-                    height=300
-                )
-                
-                # Database status
-                db_status = gr.Textbox(
-                    label="💾 Database Status",
-                    value="Ready to log predictions...",
-                    interactive=False
-                )
+                with gr.Row():
+                    prediction_display = gr.Textbox(
+                        label="Prediction",
+                        value="",
+                        interactive=False,
+                        container=True
+                    )
+                    confidence_display = gr.Textbox(
+                        label="Confidence",
+                        value="",
+                        interactive=False,
+                        container=True
+                    )
+                    true_label = gr.Textbox(
+                        label="True Label (0-9)",
+                        placeholder="Enter correct digit (optional)",
+                        value="",
+                        max_lines=1
+                    )
+                    
+                # Submit button
+                submit_btn = gr.Button("📝 Submit", variant="secondary")
+        
+        # History section
+        gr.Markdown("### History")
+        history_table = gr.Dataframe(
+            headers=["Timestamp", "Prediction", "Confidence", "Label"],
+            datatype=["str", "str", "str", "str"],
+            value=get_history_table(),
+            interactive=False,
+            row_count=100,
+            col_count=(4, "fixed")
+        )
         
         # Event handlers
         predict_btn.click(
-            fn=lambda img, true_lbl: predict_digit(img, true_lbl),
-            inputs=[canvas, true_label],
-            outputs=[prediction_output, confidence_chart, db_status]
+            fn=predict_digit,
+            inputs=[canvas],
+            outputs=[prediction_display, confidence_display, history_table, true_label]
         )
         
-        update_btn.click(
-            fn=lambda img, pred_text, true_lbl: update_true_label(img, pred_text, true_lbl),
-            inputs=[canvas, prediction_output, true_label],
-            outputs=[prediction_output]
+        submit_btn.click(
+            fn=submit_prediction,
+            inputs=[true_label],
+            outputs=[history_table]
         )
-        
-        clear_btn.click(
-            fn=lambda: (None, "Draw a digit and click 'Predict Digit' to see results!", None, "Ready to log predictions..."),
-            outputs=[canvas, prediction_output, confidence_chart, db_status]
-        )
-        
-        # Add instructions
-        gr.Markdown("""
-        ## 📝 Instructions:
-        1. **Draw** a digit (0-9) in the canvas using your mouse
-        2. **Click** "Predict Digit" to get AI prediction
-        3. **Optionally** select the correct digit and click "Update True Label" to help improve the model
-        4. **Clear** the canvas to start over
-        
-        ## 🔍 Features:
-        - 🎯 Real-time digit prediction with confidence scores
-        - 📊 Visual confidence chart for all digits
-        - 💾 Automatic logging to PostgreSQL database
-        - 📝 User feedback collection for model improvement
-        """)
     
     return interface
 
@@ -282,16 +257,15 @@ def main():
     print(f"🚀 Starting MNIST Gradio Interface...")
     print(f"📡 API Endpoint: {API_URL}")
     print(f"💾 Database available: {DATABASE_AVAILABLE}")
-    print(f"🔑 Session ID: {session_id}")
     
     # Create and launch interface
     interface = create_interface()
     
     # Launch with custom settings
     interface.launch(
-        server_name="0.0.0.0",  # Allow external connections
-        server_port=7860,       # Standard Gradio port
-        share=False,            # Set to True for public sharing
+        server_name="0.0.0.0",
+        server_port=7860,
+        share=False,
         debug=True,
         show_error=True
     )
