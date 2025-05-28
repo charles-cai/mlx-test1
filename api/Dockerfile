@@ -25,7 +25,7 @@ COPY api/ .
 # Create model directory and copy model files
 RUN mkdir -p ./model
 COPY model/MnistModel.py ./model/
-COPY model/*.pth ./model/ 2>/dev/null || true
+COPY model/*.pth ./model/
 
 # Expose the port the app runs on
 EXPOSE 8889
