@@ -7,7 +7,7 @@ DATABASE_NAME="mnist_db"
 POSTGRES_USER="postgres"
 POSTGRES_PASSWORD="password"
 POSTGRES_DB="postgres"
-POSTGRES_PORT="5432"
+POSTGRES_PORT="5442"
 POSTGRES_IMAGE="postgres:17"
 
 echo "🐘 PostgreSQL Docker Setup for MNIST Project"

@@ -70,6 +70,7 @@ SELECT * FROM predictions WHERE label IS NOT NULL;
 ```
 
 ## Troubleshooting
+Note we use 5442 due to other PostgreSQL dockers running on dev boxes.
 
 ```bash
 # Check container status
