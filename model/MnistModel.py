@@ -5,16 +5,12 @@ import numpy as np
 import argparse
 from PIL import Image
 import io
-from typing import Tuple, Dict, Optional
+from typing import Tuple, Dict
 import hashlib
-import uuid
-from datetime import datetime
-import json
 
 from datasets import load_from_disk
 from torchvision import datasets as tv_datasets, transforms
 from torch.utils.data import DataLoader, TensorDataset
-
 
 class MnistModel(nn.Module):
     """

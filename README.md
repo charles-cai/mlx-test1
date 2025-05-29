@@ -107,8 +107,6 @@ cd ..
 
 ## Quick Start
 
-For detailed deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).
-
 ```shell
 # 1. Clone and setup
 git clone https://github.com/charles-cai/mlx-test1.git
@@ -117,8 +115,8 @@ uv venv --python=python3.12
 source .venv/bin/activate
 
 # 2. Install dependencies
-cd model && pip install -r requirements.txt && cd ..
-cd app && pip install -r requirements.txt && cd ..
+cd model && uv pip install -r requirements.txt && cd ..
+cd app && uv pip install -r requirements.txt && cd ..
 
 # 3. Train model (if needed)
 cd model
