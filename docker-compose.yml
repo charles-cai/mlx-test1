@@ -1,9 +1,7 @@
-version: '3.8'
-
 services:
   # PostgreSQL Database
   postgres:
-    image: postgres:15-alpine
+    image: postgres:17
     container_name: mnist_postgres
     environment:
       POSTGRES_DB: mnist_db
@@ -21,24 +19,22 @@ services:
       retries: 3
     restart: unless-stopped
 
-  # FastAPI Backend (built from api folder)
+  # FastAPI Backend
   api:
     build:
       context: .
       dockerfile: api/Dockerfile
+    image: mnist-api:latest
     container_name: mnist_api
     ports:
       - "8889:8889"
-    environment:
-      - DATABASE_URL=postgresql://postgres:password@postgres:5432/mnist_db
-    depends_on:
-      postgres:
-        condition: service_healthy
+    # No database dependency needed for API
     restart: unless-stopped
 
   # Gradio Frontend
   app:
     build: ./app
+    image: mnist-app:latest
     container_name: mnist_gradio
     ports:
       - "7860:7860"

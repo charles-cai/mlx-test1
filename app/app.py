@@ -192,9 +192,6 @@ def create_interface():
                     canvas_size=(280, 280),
                     eraser=gr.Eraser(default_size=10),
                 )
-                
-                # fix clear button will restore the ImageEditor to be white background
-                # canvas.clear(clear_canvas)
 
                 # Predict button
                 predict_btn = gr.Button("🔮 Predict Digit", variant="primary", size="lg")
@@ -203,26 +200,25 @@ def create_interface():
                 # Results section
                 gr.Markdown("### Results")
                 
-                with gr.Row():
-                    prediction_display = gr.Textbox(
-                        label="Prediction",
-                        value="",
-                        interactive=False,
-                        container=True
-                    )
-                    confidence_display = gr.Textbox(
-                        label="Confidence",
-                        value="",
-                        interactive=False,
-                        container=True
-                    )
-                    true_label = gr.Textbox(
-                        label="True Label (0-9)",
-                        placeholder="Enter correct digit (optional)",
-                        value="",
-                        max_lines=1
-                    )
-                    
+                prediction_display = gr.Textbox(
+                    label="Prediction",
+                    value="",
+                    interactive=False,
+                    container=True
+                )
+                confidence_display = gr.Textbox(
+                    label="Confidence",
+                    value="",
+                    interactive=False,
+                    container=True
+                )
+                true_label = gr.Textbox(
+                    label="True Label (0-9)",
+                    placeholder="Enter correct digit (optional)",
+                    value="",
+                    max_lines=1
+                )
+                
                 # Submit button
                 submit_btn = gr.Button("📝 Submit", variant="secondary")
         
@@ -237,6 +233,9 @@ def create_interface():
             col_count=(4, "fixed")
         )
         
+        # fix clear button will restore the ImageEditor to be white background
+        # canvas.clear(clear_canvas)
+
         # Event handlers
         predict_btn.click(
             fn=predict_digit,
