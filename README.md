@@ -1,7 +1,4 @@
-# Machine Learning Institute Programme Assignment
-
 ## Foundation Project
-https://programme.mlx.institute/interview/project
 
 ### Overview
 
@@ -14,10 +11,6 @@ Goal: Build, containerize, and deploy a simple digit-recogniser trained on the M
 Below is a wireframe of the application you will build. It doesn't need to be laid out exactly as shown, but it should contain all the necessary functionality.
 
 ![Project Overview](project_round_one.png)
-
-
-For a live example of the application visit the link below:
-https://mnist-example.mlx.institute
 
 1. Train a PyTorch Model
  - Develop a basic PyTorch model to classify handwritten digits from the MNIST dataset.
@@ -54,30 +47,23 @@ https://mnist-example.mlx.institute
 
 ## Project Structure
 
-This project follows a clean separation of concerns with the following folder structure:
+This project uses a modular structure:
 
 ```
 mlx-test1/
 ├── data/           # MNIST dataset storage
-├── model/          # MnistModel.py + api.py (ML + FastAPI service)
-│   └── requirements.txt
-├── db/             # PostgreSQL schema initialization and documentation
-├── app/            # Gradio UI (communicates with API and database via SQLAlchemy)
-│   └── requirements.txt
+├── model/          # ML model code and training scripts
+├── db/             # PostgreSQL schema and setup scripts
+├── app/            # Gradio UI (calls API, logs to DB)
+├── api/            # FastAPI service (model files copied here for deployment)
 └── docker-compose.yml
 ```
 
-### Architecture
-
-- **data/**: Stores downloaded MNIST dataset
-- **model/**: Self-contained module with:
-  - `MnistModel.py` - ML operations (download, train, eval, inference)
-  - `api.py` - FastAPI service exposing model endpoints
-- **db/**: Database schema and PostgreSQL setup documentation
-- **app/**: Gradio web interface that:
-  - Calls model API endpoints for predictions
-  - Logs results to PostgreSQL via SQLAlchemy
-  - Provides interactive drawing canvas for digit recognition
+- **/model**: Contains `MnistModel.py` (training, inference) and related files. For deployment, model files are copied to `/api`.
+- **/api**: FastAPI service for digit prediction (serves the model in production).
+- **/app**: Gradio web interface for drawing and prediction.
+- **/db**: PostgreSQL schema and setup scripts.
+- **/data**: Downloaded MNIST dataset.
 
 ## Setup Instructions
 
@@ -95,6 +81,9 @@ source .venv/bin/activate
 # Install dependencies for each component
 cd model && pip install -r requirements.txt && cd ..
 cd app && pip install -r requirements.txt && cd ..
+
+cd api && pip install -r requirements.txt && cd ..
+# check build-dockers.sh to copy dependencies from /model to /api
 ```
 
 ### Model Training
@@ -139,9 +128,39 @@ cd ..
 # 4. Start all services
 docker-compose up --build
 
-# Access points:
-# - Gradio UI: http://localhost:7860
-# - FastAPI: http://localhost:8000
-# - PostgreSQL: localhost:5432
+## Setup Instructions
+
+### Development Workflow
+
+```bash
+# 1. Initialize PostgreSQL schema
+cd db
+./setup-postgresql.sh
+cd ..
+
+# 2. Copy model dependencies for API
+./build-dockers.sh
+
+# 3. Start the API
+./build-dockers.sh
+cd api
+python api.py
 ```
 
+## Production Workflow
+
+```bash
+# 1. Build Docker images and copy model files
+./build-dockers.sh --build
+
+# 2. Start all services
+docker compose up
+```
+
+# Access points (DEV):
+# - Gradio UI: http://localhost:7860
+# - FastAPI: http://localhost:8889
+# - PostgreSQL: localhost:5432
+
+# Access point (via Cloudflare Tunnel):
+(TBC)

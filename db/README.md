@@ -2,18 +2,20 @@
 
 Simple PostgreSQL database setup using Docker for the MNIST prediction project.
 
+> **Note:** For development, run `./setup-postgresql.sh` to initialize the database schema in the PostgreSQL Docker container before starting the API or app.
+
 ## Quick Setup
 
 ```bash
 cd db
-chmod +x setup.sh
-./setup.sh
+chmod +x setup-postgresql.sh
+./setup-postgresql.sh
 ```
 
 ## Files
 
 - `init.sql` - Database schema and table definitions
-- `setup.sh` - Docker setup script for PostgreSQL 17
+- `setup-postgresql.sh` - Docker setup script for PostgreSQL 17
 
 ## Database Schema
 
@@ -31,7 +33,7 @@ CREATE TABLE predictions (
 ## Connection Details
 
 - **Container**: mnist_postgres  
-- **Host**: localhost:5432
+- **Host**: localhost:5442
 - **Database**: mnist_db
 - **User**: postgres
 - **Password**: password
@@ -41,10 +43,10 @@ CREATE TABLE predictions (
 ### Setup and Management
 ```bash
 # Full setup (creates container + loads schema)
-./setup.sh
+./setup-postgresql.sh
 
 # Load schema only (assumes container is running)
-./setup.sh --init
+./setup-postgresql.sh --init
 
 # Connect to database
 docker exec -it mnist_postgres psql -U postgres -d mnist_db
@@ -82,5 +84,5 @@ docker logs mnist_postgres
 # Reset database
 docker stop mnist_postgres
 docker rm mnist_postgres
-./setup.sh
+./setup-postgresql.sh
 ```

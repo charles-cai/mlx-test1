@@ -9,39 +9,43 @@ FastAPI service for predicting handwritten digits using a trained CNN model.
 - Health checks and model info endpoints
 - Interactive API documentation (Swagger UI)
 
-## Quick Start
+## Quick Start (Development)
 
-### Prerequisites
+1. **Start PostgreSQL**  
+   Initialize the database schema:
+   ```bash
+   cd ../db
+   ./setup-postgresql.sh
+   cd ..
+   ```
 
-- Python 3.12+
-- A trained MNIST model file (`saved_model.pth`)
+2. **Copy model dependencies**  
+   From the project root:
+   ```bash
+   ./build-dockers.sh
+   ```
 
-### Installation
-
-```bash
-# Install with uv (recommended)
-uv pip install -r requirements.txt
-
-# Or with pip
-pip install -r requirements.txt
-```
-
-### Running the API
-
-```bash
-# Basic usage
-python api.py
-
-# Custom options
-python api.py --port 8889 --model-path /path/to/model.pth
-
-# Development mode
-python api.py --reload
-```
+3. **Run the API**  
+   ```bash
+   cd api
+   python api.py
+   ```
 
 **Available at:**
 - API: http://localhost:8889
 - Docs: http://localhost:8889/docs
+
+## Docker Usage (Production)
+
+1. **Build Docker images and copy model files**
+   ```bash
+   ./build-dockers.sh --build
+   ```
+
+2. **Start all services**
+   ```bash
+   docker compose up
+   ```
 
 ## API Endpoints
 
@@ -67,22 +71,6 @@ Upload an image file to get digit prediction.
 - `GET /health` - Health check
 - `GET /model-info` - Model information  
 - `GET /` - API information
-
-## Docker Usage
-
-```bash
-# Build and run (model files are auto-copied by build-dockers.sh)
-./build-dockers.sh --build
-./build-dockers.sh --compose
-
-# Or manual Docker build (ensure /api/model contains model files)
-docker build -t mnist-api ./api
-docker run -p 8889:8889 mnist-api
-
-# With custom model path
-# (default is /app/model/saved_model.pth inside container)
-docker run -p 8889:8889 -v /path/to/model:/app/model mnist-api
-```
 
 ## Usage Examples
 

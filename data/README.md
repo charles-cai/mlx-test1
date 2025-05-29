@@ -18,6 +18,8 @@ This will:
 2. Save it to `data/.mnist` directory
 3. Load it back and display dataset information
 
+> **Tip:** For development, always initialize your database with `./db/setup-postgresql.sh` before running the API or app.
+
 ### Script Features
 
 The script (`download-mnist.py`) provides several functions:
@@ -84,4 +86,4 @@ Each example contains:
 
 ## License
 
-his utility code is provided under MIT license. The MNIST dataset itself has its own license terms.
+MIT
