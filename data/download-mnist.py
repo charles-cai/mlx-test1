@@ -6,6 +6,7 @@ saves it to the specified directory, and provides functionality
 to load and inspect the dataset.
 
 Usage:
+    uv pip install datasets
     python download-mnist.py
 
 Note: If the dataset directory already exists and is not empty,
