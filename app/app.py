@@ -13,13 +13,14 @@ except ImportError as e:
     print(f"Database import error: {e}")
     DATABASE_AVAILABLE = False
 
-API_URL = "http://localhost:8889"
+API_URL = os.getenv("API_URL", "http://api:8889")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:password@postgres:5432/mnist_db")
+
 db_logger = None
 current_prediction = None
 current_confidence = None
 if DATABASE_AVAILABLE:
     try:
-        DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:password@localhost:5432/mnist_db")
         db_logger = PostgresLogger(
             database_url=DATABASE_URL,
             model_name="MnistModel"
@@ -175,87 +176,91 @@ def clear_canvas():
 
 def create_interface():
     """Create and configure the Gradio interface"""
+    import os
+    import json
     
     with gr.Blocks(title="MNIST Digit Recognizer", theme=gr.themes.Soft()) as interface:
         gr.Markdown("# 🔢 MNIST Digit Recognizer")
         gr.Markdown("Draw a digit (0-9) and get AI predictions!")
         
-        with gr.Row():
-            with gr.Column(scale=1):
-                # Drawing canvas with black brush
-                canvas = gr.ImageEditor(
-                    value = clear_canvas(),
-                    label="✏️ Draw a digit here",
-                    type="pil",
-                    image_mode="L",
-                    brush = gr.Brush(default_color="white", default_size=10),
-                    canvas_size=(280, 280),
-                    eraser=gr.Eraser(default_size=10),
-                )
+        with gr.Tab("Main"):
+            with gr.Row():
+                with gr.Column(scale=1):
+                    # Drawing canvas with black brush
+                    canvas = gr.ImageEditor(
+                        value = clear_canvas(),
+                        label="✏️ Draw a digit here",
+                        type="pil",
+                        image_mode="L",
+                        brush = gr.Brush(default_color="white", default_size=10),
+                        canvas_size=(280, 280),
+                        eraser=gr.Eraser(default_size=10),
+                    )
 
-                # Predict button
-                predict_btn = gr.Button("🔮 Predict Digit", variant="primary", size="lg")
+                    # Predict button
+                    predict_btn = gr.Button("🔮 Predict Digit", variant="primary", size="lg")
                 
-            with gr.Column(scale=1):
-                # Results section
-                gr.Markdown("### Results")
-                
-                prediction_display = gr.Textbox(
-                    label="Prediction",
-                    value="",
-                    interactive=False,
-                    container=True
-                )
-                confidence_display = gr.Textbox(
-                    label="Confidence",
-                    value="",
-                    interactive=False,
-                    container=True
-                )
-                true_label = gr.Textbox(
-                    label="True Label (0-9)",
-                    placeholder="Enter correct digit (optional)",
-                    value="",
-                    max_lines=1
-                )
-                
-                # Submit button
-                submit_btn = gr.Button("📝 Submit", variant="secondary")
-        
-        # History section
-        gr.Markdown("### History")
-        history_table = gr.Dataframe(
-            headers=["Timestamp", "Prediction", "Confidence", "Label"],
-            datatype=["str", "str", "str", "str"],
-            value=get_history_table(),
-            interactive=False,
-            row_count=100,
-            col_count=(4, "fixed")
-        )
-        
-        # fix clear button will restore the ImageEditor to be white background
-        # canvas.clear(clear_canvas)
-
-        # Event handlers
-        predict_btn.click(
-            fn=predict_digit,
-            inputs=[canvas],
-            outputs=[prediction_display, confidence_display, history_table, true_label]
-        )
-        
-        submit_btn.click(
-            fn=submit_prediction,
-            inputs=[true_label],
-            outputs=[history_table]
-        )
-    
+                with gr.Column(scale=1):
+                    # Results section
+                    gr.Markdown("### Results")
+                    prediction_display = gr.Textbox(
+                        label="Prediction",
+                        value="",
+                        interactive=False,
+                        container=True
+                    )
+                    confidence_display = gr.Textbox(
+                        label="Confidence",
+                        value="",
+                        interactive=False,
+                        container=True
+                    )
+                    true_label = gr.Textbox(
+                        label="True Label (0-9)",
+                        placeholder="Enter correct digit (optional)",
+                        value="",
+                        max_lines=1
+                    )
+                    # Submit button
+                    submit_btn = gr.Button("📝 Submit", variant="secondary")
+            # History section
+            gr.Markdown("### History")
+            history_table = gr.Dataframe(
+                headers=["Timestamp", "Prediction", "Confidence", "Label"],
+                datatype=["str", "str", "str", "str"],
+                value=get_history_table(),
+                interactive=False,
+                row_count=100,
+                col_count=(4, "fixed")
+            )
+            # Event handlers
+            predict_btn.click(
+                fn=predict_digit,
+                inputs=[canvas],
+                outputs=[prediction_display, confidence_display, history_table, true_label]
+            )
+            submit_btn.click(
+                fn=submit_prediction,
+                inputs=[true_label],
+                outputs=[history_table]
+            )
+        # Debug Info Tab
+        with gr.Tab("Debug Info"):
+            gr.Markdown("### Environment Variables")
+            env_text = gr.Textbox(
+                value=json.dumps(dict(os.environ), indent=2),
+                label="os.environ",
+                lines=20,
+                interactive=False
+            )
     return interface
 
 def main():
     """Main function to launch the Gradio app"""
-    print(f"🚀 Starting MNIST Gradio Interface...")
-    print(f"📡 API Endpoint: {API_URL}")
-    print(f"💾 Database available: {DATABASE_AVAILABLE}")
+    print(f"🚀 Starting MNIST Gradio Interface...", flush=True)
+    print(f"📡 API Endpoint: {API_URL}", flush=True)
+    print(f"💾 Database available: {DATABASE_AVAILABLE}", flush=True)
+    print(f"🟢 Waiting for Gradio server to launch on http://0.0.0.0:7860 ...", flush=True)
     
     # Create and launch interface
     interface = create_interface()

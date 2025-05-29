@@ -12,13 +12,13 @@ RUN apt-get update && apt-get install -y \
     && pip install uv
 
 # Copy requirements first for better caching
-COPY requirements.txt .
+COPY requirements.txt ./
 
 # Install Python dependencies using uv
 RUN uv pip install --system --no-cache -r requirements.txt
 
 # Copy the application code
-COPY . .
+COPY . ./
 
 # Expose the port the app runs on
 EXPOSE 7860

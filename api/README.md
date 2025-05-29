@@ -71,11 +71,16 @@ Upload an image file to get digit prediction.
 ## Docker Usage
 
 ```bash
-# Build and run
-docker build -t mnist-api .
+# Build and run (model files are auto-copied by build-dockers.sh)
+./build-dockers.sh --build
+./build-dockers.sh --compose
+
+# Or manual Docker build (ensure /api/model contains model files)
+docker build -t mnist-api ./api
 docker run -p 8889:8889 mnist-api
 
 # With custom model path
+# (default is /app/model/saved_model.pth inside container)
 docker run -p 8889:8889 -v /path/to/model:/app/model mnist-api
 ```
 
